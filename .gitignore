@@ -4,7 +4,8 @@
 *.dll
 *.so
 *.dylib
-smokegauge
+# Built binary in repo root only (do not use bare "smokegauge" — it ignores cmd/smokegauge/)
+/smokegauge
 
 # Test binary, built with `go test -c`
 *.test
