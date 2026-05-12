@@ -1,7 +1,25 @@
 package main
 
-import "fmt"
+import (
+	"flag"
+	"fmt"
+	"os"
+)
 
 func main() {
-	fmt.Println("Hello, World!")
+	flag.Usage = func() {
+		fmt.Fprintln(os.Stderr, "usage: smokegauge -file <path>")
+		flag.PrintDefaults()
+	}
+
+	fileName := flag.String("file", "", "path to checks config file (YAML)")
+	flag.Parse()
+
+	if *fileName == "" {
+		fmt.Fprintln(os.Stderr, "smokegauge: required flag -file not provided")
+		fmt.Fprintln(os.Stderr, "usage: smokegauge -file <path>")
+		os.Exit(2)
+	}
+
+	fmt.Println(*fileName)
 }
