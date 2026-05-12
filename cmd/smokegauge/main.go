@@ -13,17 +13,21 @@ import (
 func check(path string, err error) {
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			fmt.Fprintf(os.Stderr, "smokegauge: config file does not exist: %s\n", path)
+			printErr("config file does not exist: %s\n", path)
 		} else {
-			fmt.Fprintf(os.Stderr, "smokegauge: cannot read config file: %s: %s\n", path, err)
+			printErr("cannot read config file: %s: %v\n", path, err)
 		}
 		os.Exit(2)
 	}
 }
 
+func printErr(format string, args ...any) {
+	fmt.Fprintf(os.Stderr, "smokegauge: "+format, args...)
+}
+
 func main() {
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "smokegauge: usage: smokegauge -file <path>")
+		printErr("usage: smokegauge -file <path>")
 		flag.PrintDefaults()
 	}
 
@@ -31,8 +35,8 @@ func main() {
 	flag.Parse()
 
 	if *fileName == "" {
-		fmt.Fprintln(os.Stderr, "smokegauge: required flag -file not provided")
-		fmt.Fprintln(os.Stderr, "smokegauge: usage: smokegauge -file <path>")
+		printErr("required flag -file not provided")
+		printErr("usage: smokegauge -file <path>")
 		os.Exit(2)
 	}
 
