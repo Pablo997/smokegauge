@@ -3,31 +3,30 @@ package main
 import (
 	"errors"
 	"flag"
-	"fmt"
 	"io/fs"
 	"os"
+
+	"github.com/Pablo997/smokegauge/internal/config"
+	"github.com/Pablo997/smokegauge/internal/logger"
+	"gopkg.in/yaml.v3"
 )
 
-// Exit status 2: invalid CLI usage or unreadable config file. Failed HTTP checks will use 1.
+// Exit codes: 2 = bad CLI usage, missing file, invalid YAML, or failed config validation; 1 reserved for failed HTTP checks (runner).
 
 func check(path string, err error) {
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			printErr("config file does not exist: %s\n", path)
+			logger.PrintErr("config file does not exist: %s\n", path)
 		} else {
-			printErr("cannot read config file: %s: %v\n", path, err)
+			logger.PrintErr("cannot read config file: %s: %v\n", path, err)
 		}
 		os.Exit(2)
 	}
 }
 
-func printErr(format string, args ...any) {
-	fmt.Fprintf(os.Stderr, "smokegauge: "+format, args...)
-}
-
 func main() {
 	flag.Usage = func() {
-		printErr("usage: smokegauge -file <path>")
+		logger.PrintErr("usage: smokegauge -file <path>\n")
 		flag.PrintDefaults()
 	}
 
@@ -35,11 +34,27 @@ func main() {
 	flag.Parse()
 
 	if *fileName == "" {
-		printErr("required flag -file not provided")
-		printErr("usage: smokegauge -file <path>")
+		logger.PrintErr("required flag -file not provided\n")
+		logger.PrintErr("usage: smokegauge -file <path>\n")
 		os.Exit(2)
 	}
 
-	_, err := os.ReadFile(*fileName)
+	var err error
+	data, err := os.ReadFile(*fileName)
 	check(*fileName, err)
+
+	var file config.Config
+	err = yaml.Unmarshal(data, &file)
+	if err != nil {
+		logger.PrintErr("invalid config YAML: %v\n", err)
+		os.Exit(2)
+	}
+
+	validationErrs := file.Validate()
+	if len(validationErrs) > 0 {
+		for _, validationErr := range validationErrs {
+			logger.PrintErr("%v\n", validationErr)
+		}
+		os.Exit(2)
+	}
 }
