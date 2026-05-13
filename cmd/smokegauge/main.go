@@ -1,8 +1,8 @@
 // Command smokegauge loads a YAML check file, validates it, runs HTTP probes, and exits:
 //
-//   0 - all checks passed
-//   1 - at least one check failed (network or unexpected status)
-//   2 - invalid usage, missing file, invalid YAML, or invalid configuration
+//	0 - all checks passed
+//	1 - at least one check failed (network or unexpected status)
+//	2 - invalid usage, missing file, invalid YAML, or invalid configuration
 package main
 
 import (
