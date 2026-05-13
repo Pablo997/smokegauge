@@ -7,6 +7,7 @@ import (
 	time2 "time"
 
 	"github.com/Pablo997/smokegauge/internal/config"
+	"golang.org/x/sync/errgroup"
 )
 
 // HTTPResponse captures one failed check for CLI reporting.
@@ -42,22 +43,38 @@ func Run(method string, url string, timeout string) (int, error) {
 	return resp.StatusCode, err
 }
 
-// RunChecks runs every check in file sequentially using file.Defaults.Timeout.
-// It returns only failed checks; an empty slice means all checks succeeded.
+// RunChecks runs all checks in file concurrently, bounded by file.Defaults.Concurrency, using
+// file.Defaults.Timeout for each request. It returns only failed checks; an empty slice means success.
 func RunChecks(file config.Config) []HTTPResponse {
 	var responses []HTTPResponse
-	for _, chk := range file.Checks {
-		statusCode, err := Run(chk.Method, chk.URL, file.Defaults.Timeout)
-		var response HTTPResponse
-		if err != nil {
-			response = HTTPResponse{Name: chk.Name, Error: err, StatusCode: statusCode, WantStatus: chk.WantStatus}
-			responses = append(responses, response)
-		}
-		if statusCode != chk.WantStatus {
-			if response.Error == nil {
-				response = HTTPResponse{Name: chk.Name, Error: err, StatusCode: statusCode, WantStatus: chk.WantStatus}
-				responses = append(responses, response)
+	response := make([]*HTTPResponse, len(file.Checks))
+	g := new(errgroup.Group)
+	sem := make(chan struct{}, file.Defaults.Concurrency)
+
+	for i, chk := range file.Checks {
+		chk := chk
+		i := i
+		g.Go(func() error {
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			statusCode, err := Run(chk.Method, chk.URL, file.Defaults.Timeout)
+			if err != nil {
+				response[i] = &HTTPResponse{Name: chk.Name, Error: err, StatusCode: statusCode, WantStatus: chk.WantStatus}
 			}
+			if statusCode != chk.WantStatus {
+				if response[i] == nil {
+					response[i] = &HTTPResponse{Name: chk.Name, Error: err, StatusCode: statusCode, WantStatus: chk.WantStatus}
+				}
+			}
+			return nil
+		})
+	}
+	_ = g.Wait()
+
+	for _, slot := range response {
+		if slot != nil {
+			responses = append(responses, *slot)
 		}
 	}
 	return responses

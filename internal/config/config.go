@@ -43,6 +43,10 @@ func (c *Config) Validate() []error {
 		errs = append(errs, err)
 	}
 
+	if c.Defaults.Concurrency <= 0 {
+		errs = append(errs, fmt.Errorf("value %d is not allowed for concurrency. Please, introduce a value higher than 0", c.Defaults.Concurrency))
+	}
+
 	if len(c.Checks) == 0 {
 		errs = append(errs, errors.New("check section is empty"))
 	} else {
