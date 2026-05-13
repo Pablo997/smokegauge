@@ -1,3 +1,4 @@
+// Package config defines the smokegauge YAML configuration model and validation rules.
 package config
 
 import (
@@ -6,11 +7,13 @@ import (
 	time2 "time"
 )
 
+// Defaults holds per-run settings from the config file's defaults section.
 type Defaults struct {
 	Timeout     string
 	Concurrency int
 }
 
+// Check is a single HTTP probe described in YAML.
 type Check struct {
 	Name       string
 	Method     string
@@ -18,6 +21,7 @@ type Check struct {
 	WantStatus int    `yaml:"want_status"`
 }
 
+// Config is the root document loaded from a checks YAML file.
 type Config struct {
 	// Version is the config file schema revision (e.g. 1), not the smokegauge binary semver.
 	Version  int
@@ -25,7 +29,7 @@ type Config struct {
 	Checks   []Check
 }
 
-// Validate returns all independent issues found; nil or empty slice means the config is structurally acceptable.
+// Validate reports problems with c. An empty return value means c is acceptable for execution.
 func (c *Config) Validate() []error {
 	var errs []error
 	if c.Version == 0 {

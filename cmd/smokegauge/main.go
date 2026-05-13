@@ -1,3 +1,8 @@
+// Command smokegauge loads a YAML check file, validates it, runs HTTP probes, and exits:
+//
+//   0 - all checks passed
+//   1 - at least one check failed (network or unexpected status)
+//   2 - invalid usage, missing file, invalid YAML, or invalid configuration
 package main
 
 import (
@@ -11,8 +16,6 @@ import (
 	"github.com/Pablo997/smokegauge/internal/runner"
 	"gopkg.in/yaml.v3"
 )
-
-// Exit codes: 2 = bad CLI usage, missing file, invalid YAML, or failed config validation; 1 reserved for failed HTTP checks (runner).
 
 func check(path string, err error) {
 	if err != nil {
@@ -59,15 +62,16 @@ func main() {
 		os.Exit(2)
 	}
 
-	// Until the runner iterates over all checks, only the first entry is executed.
-	chk := file.Checks[0]
-	statusCode, err := runner.Run(chk.Method, chk.URL, file.Defaults.Timeout)
-	if err != nil {
-		logger.PrintErr("%v\n", err)
-		os.Exit(1)
+	responses := runner.RunChecks(file)
+
+	for _, resp := range responses {
+		if resp.Error != nil {
+			logger.PrintErr("%s: %v\n", resp.Name, resp.Error)
+		} else if resp.StatusCode != resp.WantStatus {
+			logger.PrintErr("%s: bad response. Got <%d> and expect <%d>\n", resp.Name, resp.StatusCode, resp.WantStatus)
+		}
 	}
-	if statusCode != chk.WantStatus {
-		logger.PrintErr("bad response. Got <%d> and expect <%d>\n", statusCode, chk.WantStatus)
+	if len(responses) > 0 {
 		os.Exit(1)
 	}
 }
