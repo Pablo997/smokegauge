@@ -8,6 +8,7 @@ import (
 
 	"github.com/Pablo997/smokegauge/internal/config"
 	"github.com/Pablo997/smokegauge/internal/logger"
+	"github.com/Pablo997/smokegauge/internal/runner"
 	"gopkg.in/yaml.v3"
 )
 
@@ -56,5 +57,17 @@ func main() {
 			logger.PrintErr("%v\n", validationErr)
 		}
 		os.Exit(2)
+	}
+
+	// Until the runner iterates over all checks, only the first entry is executed.
+	chk := file.Checks[0]
+	statusCode, err := runner.Run(chk.Method, chk.URL, file.Defaults.Timeout)
+	if err != nil {
+		logger.PrintErr("%v\n", err)
+		os.Exit(1)
+	}
+	if statusCode != chk.WantStatus {
+		logger.PrintErr("bad response. Got <%d> and expect <%d>\n", statusCode, chk.WantStatus)
+		os.Exit(1)
 	}
 }

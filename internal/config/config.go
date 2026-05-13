@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	time2 "time"
 )
 
 type Defaults struct {
@@ -31,6 +32,11 @@ func (c *Config) Validate() []error {
 		errs = append(errs, errors.New("config schema version is missing (add version: 1)"))
 	} else if c.Version != 1 {
 		errs = append(errs, fmt.Errorf("unsupported schema version: %d (only 1 supported)", c.Version))
+	}
+
+	_, err := time2.ParseDuration(c.Defaults.Timeout)
+	if err != nil {
+		errs = append(errs, err)
 	}
 
 	if len(c.Checks) == 0 {
