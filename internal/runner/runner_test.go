@@ -119,7 +119,7 @@ func TestRunChecks_FailsOnUnexpectedStatus(t *testing.T) {
 	if got[0].WantStatus != http.StatusOK {
 		t.Errorf("WantStatus: want %d, got %d", http.StatusOK, got[0].WantStatus)
 	}
-	if got[0].Error != nil {
+	if got[0].Error != "" {
 		t.Errorf("want nil transport error for HTTP teapot, got %v", got[0].Error)
 	}
 }

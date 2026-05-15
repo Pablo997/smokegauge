@@ -13,7 +13,7 @@ import (
 // HTTPResponse captures one failed check for CLI reporting.
 type HTTPResponse struct {
 	Name       string
-	Error      error
+	Error      string // transport error message; empty when the failure is status-only
 	StatusCode int
 	WantStatus int
 }
@@ -60,11 +60,16 @@ func RunChecks(file config.Config) []HTTPResponse {
 
 			statusCode, err := Run(chk.Method, chk.URL, file.Defaults.Timeout)
 			if err != nil {
-				response[i] = &HTTPResponse{Name: chk.Name, Error: err, StatusCode: statusCode, WantStatus: chk.WantStatus}
+				response[i] = &HTTPResponse{Name: chk.Name, Error: err.Error(), StatusCode: statusCode, WantStatus: chk.WantStatus}
 			}
 			if statusCode != chk.WantStatus {
 				if response[i] == nil {
-					response[i] = &HTTPResponse{Name: chk.Name, Error: err, StatusCode: statusCode, WantStatus: chk.WantStatus}
+					if err == nil {
+						response[i] = &HTTPResponse{Name: chk.Name, Error: "", StatusCode: statusCode, WantStatus: chk.WantStatus}
+
+					} else {
+						response[i] = &HTTPResponse{Name: chk.Name, Error: err.Error(), StatusCode: statusCode, WantStatus: chk.WantStatus}
+					}
 				}
 			}
 			return nil
