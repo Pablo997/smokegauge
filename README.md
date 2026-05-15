@@ -1,41 +1,29 @@
 # smokegauge
 
-**smokegauge** is a small command-line tool that runs fast HTTP smoke checks from a declarative YAML file. Point it at a config, it performs the requests, validates status codes (and optional response rules), aggregates results, and exits with a status suitable for CI pipelines.
-
-Use it after deploys, in GitHub Actions, or locally to prove that critical endpoints still behave as expected—without maintaining a full integration suite for every trivial probe.
-
----
-
-## Why this exists
-
-- **Fast feedback:** parallel checks with sensible timeouts and cancellation.
-- **Contract-ish checks in one file:** URLs, methods, expected status, optional headers/body rules—versioned next to your infra or app repo.
-- **Script-friendly:** stable exit codes and optional machine-readable output.
+**smokegauge** is a small CLI that runs HTTP smoke checks from a YAML file. It loads the config, runs probes in parallel (with a concurrency limit), compares status codes, and exits with codes suitable for shell scripts and CI.
 
 ---
 
 ## Features
 
-- Load checks from a YAML configuration file.
-- Execute HTTP requests with per-check and global timeouts (`context`-aware).
-- Run checks concurrently with a configurable concurrency limit.
-- Match expected HTTP status codes; optional assertions on headers or response body (substring or regex, depending on implementation).
-- Human-readable summary table and optional JSON output for logs and dashboards.
-- Non-zero exit code when any check fails or the config is invalid—ideal for `&&` in shell scripts and CI gates.
+- YAML config with schema version, defaults (`timeout`, `concurrency`), and a list of checks
+- Concurrent execution bounded by `defaults.concurrency`
+- Per-request timeout from `defaults.timeout` (Go duration string, e.g. `5s`)
+- Human-readable failures on **stderr** (`-format text`, default)
+- Machine-readable report on **stdout** (`-format json`)
+- Stable exit codes: `0` success, `1` check failure, `2` config/usage/encode errors
+
+---
+
+## Requirements
+
+- Go **1.25+** (see `go.mod`)
 
 ---
 
 ## Installation
 
-### From source (requires Go 1.22+)
-
-```bash
-go install github.com/Pablo997/smokegauge/cmd/smokegauge@latest
-```
-
-The binary is installed to `$GOPATH/bin` or `$(go env GOPATH)/bin`. Ensure that directory is on your `PATH`.
-
-### Build locally
+### Build from source
 
 ```bash
 git clone https://github.com/Pablo997/smokegauge.git
@@ -43,99 +31,101 @@ cd smokegauge
 go build -o smokegauge ./cmd/smokegauge
 ```
 
-On Windows, use `smokegauge.exe` as the output name if you prefer.
+On Windows, `smokegauge.exe` is fine.
+
+### Install with Go
+
+```bash
+go install github.com/Pablo997/smokegauge/cmd/smokegauge@latest
+```
+
+Ensure `$(go env GOPATH)/bin` is on your `PATH`.
 
 ---
 
 ## Quick start
 
-1. Create a config file (e.g. `checks.yaml`):
+A sample config lives in [`testdata/checks.yaml`](testdata/checks.yaml):
 
 ```yaml
 version: 1
 
 defaults:
   timeout: 5s
-  concurrency: 8
+  concurrency: 4
 
 checks:
-  - name: api health
+  - name: example health
     method: GET
-    url: https://api.example.com/health
+    url: https://example.com/
     want_status: 200
-
-  - name: docs redirect
-    method: GET
-    url: https://example.com/docs
-    want_status: 301
-    want_header:
-      Location: "https://example.com/docs/"
 ```
 
-2. Run smokegauge:
+Run checks:
 
 ```bash
-smokegauge --file checks.yaml
+go run ./cmd/smokegauge -file testdata/checks.yaml
 ```
 
-3. In CI, fail the job on failures:
+JSON output (stdout; errors still go to stderr):
 
 ```bash
-smokegauge --file checks.yaml --format text
+go run ./cmd/smokegauge -file testdata/checks.yaml -format json
 ```
 
----
+Example JSON shape:
 
-## Configuration reference
+```json
+{
+  "Ok": true,
+  "Failures": []
+}
+```
 
-### Top level
-
-| Field | Type | Description |
-|--------|------|-------------|
-| `version` | int | Config schema version. Currently `1`. |
-| `defaults` | object | Optional defaults applied to all checks unless overridden. |
-| `checks` | array | List of checks to run. |
-
-### `defaults` (optional)
-
-| Field | Type | Description |
-|--------|------|-------------|
-| `timeout` | duration | Default per-request timeout (e.g. `10s`, `500ms`). |
-| `concurrency` | int | Max in-flight requests across all checks. |
-
-### Each check
-
-| Field | Type | Required | Description |
-|--------|------|----------|-------------|
-| `name` | string | recommended | Short label for logs and output. |
-| `method` | string | yes | HTTP method (`GET`, `POST`, …). |
-| `url` | string | yes | Full URL to request. |
-| `want_status` | int or list | yes | Expected HTTP status code(s). |
-| `headers` | map | no | Extra request headers. |
-| `body` | string | no | Raw request body (for `POST`/`PUT`). |
-| `want_header` | map | no | Expected response headers (exact or prefix rules as implemented). |
-| `want_body_contains` | string | no | Response body must contain this substring. |
-| `want_body_regex` | string | no | Response body must match this regex. |
-| `timeout` | duration | no | Override default timeout for this check only. |
-
-Exact matching rules for headers and body may be tightened over time; treat the YAML as the source of truth documented in releases.
+On failure, `Ok` is `false` and `Failures` lists each failed check with `Name`, `Error` (transport message, or empty for status-only failures), `StatusCode`, and `WantStatus`.
 
 ---
 
 ## CLI
 
 ```text
-smokegauge --file <path> [flags]
+smokegauge -file <path> [-format text|json]
 ```
 
-| Flag | Description |
-|------|-------------|
-| `--file` | Path to the YAML configuration file (required). |
-| `--format` | Output format: `text` (default) or `json`. |
-| `--verbose` | Log each check start/finish and errors to stderr. |
-| `--version` | Print version and exit. |
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-file` | *(required)* | Path to the checks YAML file |
+| `-format` | `text` | `text`: human messages on stderr; `json`: report on stdout |
 
-Environment variables are not required; keep secrets out of committed YAML (use CI-injected files or private overlays).
+The standard library `flag` package is used; `-file` and `--file` both work.
+
+---
+
+## Configuration
+
+### Top level
+
+| Field | Type | Description |
+|--------|------|-------------|
+| `version` | int | Config schema version. Only **`1`** is supported. |
+| `defaults` | object | Default timeout and concurrency for all checks |
+| `checks` | array | HTTP checks to run (at least one) |
+
+### `defaults`
+
+| Field | Type | Description |
+|--------|------|-------------|
+| `timeout` | string | Go duration for each request (e.g. `5s`, `500ms`) |
+| `concurrency` | int | Maximum concurrent requests (must be **> 0**) |
+
+### Each check
+
+| Field | Type | Description |
+|--------|------|-------------|
+| `name` | string | Label in logs / JSON (recommended) |
+| `method` | string | HTTP method (e.g. `GET`) |
+| `url` | string | Full URL |
+| `want_status` | int | Expected HTTP status code |
 
 ---
 
@@ -143,9 +133,11 @@ Environment variables are not required; keep secrets out of committed YAML (use 
 
 | Code | Meaning |
 |------|---------|
-| `0` | All checks passed and config was valid. |
-| `1` | One or more checks failed (wrong status, assertion, timeout). |
-| `2` | Usage error, missing file, or invalid YAML / schema. |
+| `0` | All checks passed |
+| `1` | One or more checks failed (network error or unexpected status) |
+| `2` | Invalid flags, missing file, invalid YAML, config validation failed, or JSON encoding failed |
+
+In **text** mode, transport errors are printed before status mismatch messages when both apply.
 
 ---
 
@@ -153,17 +145,14 @@ Environment variables are not required; keep secrets out of committed YAML (use 
 
 ```text
 smokegauge/
-  cmd/
-    smokegauge/          # CLI entrypoint: flags, wiring, os.Exit
+  cmd/smokegauge/     # main, flags
   internal/
-    config/              # Load and validate YAML into structs
-    runner/              # HTTP client, concurrency, per-check execution
-  go.mod
-  README.md
+    config/           # YAML model and validation
+    runner/           # HTTP execution and concurrency
+    logger/           # stderr / stdout formatting
+  testdata/           # sample checks.yaml
+  .github/workflows/  # CI (test, vet, build)
 ```
-
-- **`cmd/`** — thin `main` packages; one folder per binary.
-- **`internal/`** — libraries used only by this module; not importable by other modules at stable paths (Go enforcement).
 
 ---
 
@@ -172,18 +161,19 @@ smokegauge/
 ```bash
 go test ./...
 go vet ./...
+gofmt -l .   # should print nothing
 ```
 
-HTTP behavior should be covered with `net/http/httptest` so tests do not depend on the public internet.
+CI runs on push/PR to `main` or `master` (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 
 ---
 
 ## License
 
-Specify your license in a `LICENSE` file (e.g. MIT) when you publish the repository.
+MIT — see [LICENSE](LICENSE).
 
 ---
 
 ## Author
 
-[Pablo997](https://github.com/Pablo997) — *smokegauge* is a personal learning and tooling project.
+[Pablo997](https://github.com/Pablo997)
