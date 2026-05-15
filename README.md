@@ -1,8 +1,8 @@
 # smokegauge
 
-[![CI](https://github.com/Pablo997/smokegauge/actions/workflows/ci.yml/badge.svg)](https://github.com/Pablo997/smokegauge/actions/workflows/ci.yml)
-[![Go](https://img.shields.io/github/go-mod/go-version/Pablo997/smokegauge)](https://go.dev/)
-[![License: MIT](https://img.shields.io/github/license/Pablo997/smokegauge)](LICENSE)
+[![CI](https://github.com/Pablo997/smokegauge/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Pablo997/smokegauge/actions/workflows/ci.yml)
+[![Go](https://img.shields.io/github/go-mod/go-version/Pablo997/smokegauge?branch=main)](https://go.dev/)
+[![License: MIT](https://img.shields.io/github/license/Pablo997/smokegauge?branch=main)](LICENSE)
 
 **smokegauge** is a small CLI that runs HTTP smoke checks from a YAML file. It loads the config, runs probes in parallel (with a concurrency limit), compares status codes, and exits with codes suitable for shell scripts and CI.
 
