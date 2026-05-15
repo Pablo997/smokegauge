@@ -18,9 +18,21 @@ type HTTPResponse struct {
 	WantStatus int
 }
 
-// Run executes a single HTTP request. timeout must parse as a Go duration (for example "5s").
+// recordFailure stores at most one failure per check index; transport errors take precedence over status mismatches.
+func recordFailure(response []*HTTPResponse, statusCode int, chk config.Check, i int, err error) {
+	if err != nil {
+		response[i] = &HTTPResponse{Name: chk.Name, Error: err.Error(), StatusCode: statusCode, WantStatus: chk.WantStatus}
+	}
+	if statusCode != chk.WantStatus {
+		if response[i] == nil {
+			response[i] = &HTTPResponse{Name: chk.Name, Error: "", StatusCode: statusCode, WantStatus: chk.WantStatus}
+		}
+	}
+}
+
+// Run executes one HTTP request with client (safe for concurrent use). timeout must parse as a Go duration (for example "5s").
 // When err is non-nil, StatusCode may still be set if the server returned a response before the error.
-func Run(method string, url string, timeout string) (int, error) {
+func Run(client *http.Client, method string, url string, timeout string) (int, error) {
 	duration, err := time2.ParseDuration(timeout)
 	if err != nil {
 		return 0, err
@@ -33,7 +45,6 @@ func Run(method string, url string, timeout string) (int, error) {
 		return 0, err
 	}
 
-	client := http.Client{}
 	resp, err := client.Do(req)
 	if resp == nil {
 		return 0, err
@@ -43,13 +54,14 @@ func Run(method string, url string, timeout string) (int, error) {
 	return resp.StatusCode, err
 }
 
-// RunChecks runs all checks in file concurrently, bounded by file.Defaults.Concurrency, using
-// file.Defaults.Timeout for each request. It returns only failed checks; an empty slice means success.
+// RunChecks runs all checks concurrently with one shared http.Client, bounded by file.Defaults.Concurrency.
+// Each request uses file.Defaults.Timeout. Returns only failed checks; an empty slice means success.
 func RunChecks(file config.Config) []HTTPResponse {
-	var responses []HTTPResponse
+	var failures []HTTPResponse
 	response := make([]*HTTPResponse, len(file.Checks))
 	g := new(errgroup.Group)
 	sem := make(chan struct{}, file.Defaults.Concurrency)
+	client := &http.Client{}
 
 	for i, chk := range file.Checks {
 		chk := chk
@@ -57,21 +69,8 @@ func RunChecks(file config.Config) []HTTPResponse {
 		g.Go(func() error {
 			sem <- struct{}{}
 			defer func() { <-sem }()
-
-			statusCode, err := Run(chk.Method, chk.URL, file.Defaults.Timeout)
-			if err != nil {
-				response[i] = &HTTPResponse{Name: chk.Name, Error: err.Error(), StatusCode: statusCode, WantStatus: chk.WantStatus}
-			}
-			if statusCode != chk.WantStatus {
-				if response[i] == nil {
-					if err == nil {
-						response[i] = &HTTPResponse{Name: chk.Name, Error: "", StatusCode: statusCode, WantStatus: chk.WantStatus}
-
-					} else {
-						response[i] = &HTTPResponse{Name: chk.Name, Error: err.Error(), StatusCode: statusCode, WantStatus: chk.WantStatus}
-					}
-				}
-			}
+			statusCode, err := Run(client, chk.Method, chk.URL, file.Defaults.Timeout)
+			recordFailure(response, statusCode, chk, i, err)
 			return nil
 		})
 	}
@@ -79,8 +78,8 @@ func RunChecks(file config.Config) []HTTPResponse {
 
 	for _, slot := range response {
 		if slot != nil {
-			responses = append(responses, *slot)
+			failures = append(failures, *slot)
 		}
 	}
-	return responses
+	return failures
 }

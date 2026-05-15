@@ -20,8 +20,9 @@ func TestRun_OK(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	t.Cleanup(srv.Close)
+	client := &http.Client{}
 
-	code, err := runner.Run(http.MethodGet, srv.URL+"/health", "5s")
+	code, err := runner.Run(client, http.MethodGet, srv.URL+"/health", "5s")
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -37,8 +38,9 @@ func TestRun_WrongHTTPStatusStillNoTransportError(t *testing.T) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	t.Cleanup(srv.Close)
+	client := &http.Client{}
 
-	code, err := runner.Run(http.MethodGet, srv.URL+"/missing", "5s")
+	code, err := runner.Run(client, http.MethodGet, srv.URL+"/missing", "5s")
 	if err != nil {
 		t.Fatalf("unexpected transport error: %v", err)
 	}
@@ -54,8 +56,9 @@ func TestRun_InvalidTimeout(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	t.Cleanup(srv.Close)
+	client := &http.Client{}
 
-	_, err := runner.Run(http.MethodGet, srv.URL+"/", "not-a-duration")
+	_, err := runner.Run(client, http.MethodGet, srv.URL+"/", "not-a-duration")
 	if err == nil {
 		t.Fatal("want error from invalid duration, got nil")
 	}
