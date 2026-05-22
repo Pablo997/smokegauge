@@ -4,9 +4,11 @@ version: 1
 defaults:
   timeout: 5s
   concurrency: 4
+  max_body_bytes: 1000
 
 checks:
   - name: example health
     method: GET
     url: https://example.com/
     want_status: 200
+    want_body_contains: "ok"

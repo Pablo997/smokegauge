@@ -9,8 +9,9 @@ import (
 
 // Defaults holds per-run settings from the config file's defaults section.
 type Defaults struct {
-	Timeout     string
-	Concurrency int
+	Timeout      string
+	Concurrency  int
+	MaxBodyBytes int64 `yaml:"max_body_bytes"`
 }
 
 // Check is a single HTTP probe described in YAML.
@@ -19,6 +20,9 @@ type Check struct {
 	Method     string
 	URL        string `yaml:"url"`
 	WantStatus int    `yaml:"want_status"`
+
+	//Optional fields
+	BodyContains string `yaml:"want_body_contains"`
 }
 
 // Config is the root document loaded from a checks YAML file.
@@ -46,6 +50,9 @@ func (c *Config) Validate() []error {
 	if c.Defaults.Concurrency <= 0 {
 		errs = append(errs, fmt.Errorf("value %d is not allowed for concurrency. Please, introduce a value higher than 0", c.Defaults.Concurrency))
 	}
+	if c.Defaults.MaxBodyBytes == 0 {
+		c.Defaults.MaxBodyBytes = 1 << 20
+	}
 
 	if len(c.Checks) == 0 {
 		errs = append(errs, errors.New("check section is empty"))
@@ -53,6 +60,9 @@ func (c *Config) Validate() []error {
 		for i, check := range c.Checks {
 			if check.URL == "" {
 				errs = append(errs, fmt.Errorf("the URL for check at index %d is empty", i))
+			}
+			if check.Method == "" {
+				errs = append(errs, fmt.Errorf("the method for check at index %d is empty", i))
 			}
 		}
 	}

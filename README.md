@@ -10,9 +10,10 @@
 
 ## Features
 
-- YAML config with schema version, defaults (`timeout`, `concurrency`), and a list of checks
+- YAML config with schema version, defaults (`timeout`, `concurrency`, `max_body_bytes`), and a list of checks
 - Concurrent execution bounded by `defaults.concurrency`
 - Per-request timeout from `defaults.timeout` (Go duration string, e.g. `5s`)
+- Optional response body substring checks with `want_body_contains`
 - Human-readable failures on **stderr** (`-format text`, default)
 - Machine-readable report on **stdout** (`-format json`)
 - Stable exit codes: `0` success, `1` check failure, `2` config/usage/encode errors
@@ -57,12 +58,14 @@ version: 1
 defaults:
   timeout: 5s
   concurrency: 4
+  max_body_bytes: 1000
 
 checks:
   - name: example health
     method: GET
     url: https://example.com/
     want_status: 200
+    want_body_contains: "ok"
 ```
 
 Run checks:
@@ -86,7 +89,7 @@ Example JSON shape:
 }
 ```
 
-On failure, `Ok` is `false` and `Failures` lists each failed check with `Name`, `Error` (transport message, or empty for status-only failures), `StatusCode`, and `WantStatus`.
+On failure, `Ok` is `false` and `Failures` lists each failed check with `Name`, `Error` (transport/body message, or empty for status-only failures), `StatusCode`, and `WantStatus`.
 
 ---
 
@@ -112,7 +115,7 @@ The standard library `flag` package is used; `-file` and `--file` both work.
 | Field | Type | Description |
 |--------|------|-------------|
 | `version` | int | Config schema version. Only **`1`** is supported. |
-| `defaults` | object | Default timeout and concurrency for all checks |
+| `defaults` | object | Default timeout, concurrency, and body read limit for all checks |
 | `checks` | array | HTTP checks to run (at least one) |
 
 ### `defaults`
@@ -121,6 +124,7 @@ The standard library `flag` package is used; `-file` and `--file` both work.
 |--------|------|-------------|
 | `timeout` | string | Go duration for each request (e.g. `5s`, `500ms`) |
 | `concurrency` | int | Maximum concurrent requests (must be **> 0**) |
+| `max_body_bytes` | int | Maximum response body bytes read when checking `want_body_contains` (defaults to **1 MiB**) |
 
 ### Each check
 
@@ -130,6 +134,7 @@ The standard library `flag` package is used; `-file` and `--file` both work.
 | `method` | string | HTTP method (e.g. `GET`) |
 | `url` | string | Full URL |
 | `want_status` | int | Expected HTTP status code |
+| `want_body_contains` | string | Optional substring expected in the response body |
 
 ---
 
@@ -138,10 +143,10 @@ The standard library `flag` package is used; `-file` and `--file` both work.
 | Code | Meaning |
 |------|---------|
 | `0` | All checks passed |
-| `1` | One or more checks failed (network error or unexpected status) |
+| `1` | One or more checks failed (network error, unexpected status, or body mismatch) |
 | `2` | Invalid flags, missing file, invalid YAML, config validation failed, or JSON encoding failed |
 
-In **text** mode, transport errors are printed before status mismatch messages when both apply.
+In **text** mode, transport errors are printed before status mismatch messages, and status mismatches take precedence over body mismatch messages.
 
 ---
 
