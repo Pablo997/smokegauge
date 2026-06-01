@@ -84,12 +84,12 @@ Example JSON shape:
 
 ```json
 {
-  "Ok": true,
-  "Failures": []
+  "ok": true,
+  "failures": []
 }
 ```
 
-On failure, `Ok` is `false` and `Failures` lists each failed check with `Name`, `Error` (transport/body message, or empty for status-only failures), `StatusCode`, and `WantStatus`.
+On failure, `ok` is `false` and `failures` lists each failed check with `name`, `error` (transport/body message, or empty for status-only failures), `status_code`, and `want_status`.
 
 ---
 
@@ -97,14 +97,16 @@ On failure, `Ok` is `false` and `Failures` lists each failed check with `Name`, 
 
 ```text
 smokegauge -file <path> [-format text|json]
+smokegauge -version
 ```
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `-file` | *(required)* | Path to the checks YAML file |
 | `-format` | `text` | `text`: human messages on stderr; `json`: report on stdout |
+| `-version` | `false` | Print the smokegauge version and exit |
 
-The standard library `flag` package is used; `-file` and `--file` both work.
+The standard library `flag` package is used; `-file` and `--file` both work. `-version` does not require `-file`.
 
 ---
 

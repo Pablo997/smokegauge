@@ -29,13 +29,19 @@ func check(path string, err error) {
 // parseFlags parses -file and -format; invalid usage exits with code 2.
 func parseFlags() flagsOptions {
 	flag.Usage = func() {
-		logger.PrintErr("usage: smokegauge -file <path> [-format <text/json>]\n")
+		logger.PrintErr("usage: smokegauge -file <path> [-format <text/json> -version]\n")
 		flag.PrintDefaults()
 	}
 
 	fileName := flag.String("file", "", "path to checks config file (YAML)")
 	format := flag.String("format", "text", "style of the response (text/json)")
+	showVersion := flag.Bool("version", false, "print the version")
 	flag.Parse()
+
+	if *showVersion {
+		logger.PrintLn("smokegauge " + version)
+		os.Exit(0)
+	}
 
 	if *fileName == "" {
 		logger.PrintErr("required flag -file not provided\n")

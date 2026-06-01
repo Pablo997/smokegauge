@@ -15,13 +15,13 @@ import (
 
 // HTTPResponse captures one failed check for CLI reporting.
 type HTTPResponse struct {
-	Name       string
-	Error      string // transport error message; empty when the failure is status-only
-	StatusCode int
-	WantStatus int
+	Name       string `json:"name"`
+	Error      string `json:"error,omitempty"` // transport error message; empty when the failure is status-only
+	StatusCode int    `json:"status_code"`
+	WantStatus int    `json:"want_status"`
 
 	//Optional fields
-	BodyContains bool
+	BodyContains bool `json:"-"`
 }
 
 // recordFailure stores at most one failure per check index; transport errors take precedence over status mismatches.

@@ -11,13 +11,17 @@ import (
 
 // JSONStdout is the root object written to stdout when -format json is used.
 type JSONStdout struct {
-	Ok       bool
-	Failures []runner.HTTPResponse
+	Ok       bool                  `json:"ok"`
+	Failures []runner.HTTPResponse `json:"failures"`
 }
 
 // PrintErr writes a prefixed line to standard error. format and args follow [fmt.Fprintf] conventions.
 func PrintErr(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, "smokegauge: "+format, args...)
+}
+
+func PrintLn(text string) {
+	fmt.Println(text)
 }
 
 func printJSON(message []byte) {
